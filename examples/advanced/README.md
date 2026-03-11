@@ -2,14 +2,10 @@
 
 This example demonstrates the advanced usage of the terraform-alicloud-tags module with tag governance features including:
 
-- Standard tag generation with all parameters
-- Custom tags merged with standard tags
 - Tag policy creation and attachment to current account
-- Meta tag (predefined tag) registration from standard tags
-- Additional custom meta tags
-- Disaster recovery flag usage
-- GDPR personal data classification
-- Repository tracking
+- Meta tag (predefined tag) registration
+- Associated rules for automatic tag propagation
+- Multi-region provider configuration (Shanghai for tag policies, Hangzhou for meta tags)
 
 ## Usage
 
@@ -25,7 +21,6 @@ To clean up:
 terraform destroy
 ```
 
-## Note
+## Cost
 
-- The `alicloud_tag_meta_tag` resource only supports the `cn-hangzhou` region, so this example uses `cn-hangzhou` as the provider region.
-- Tag policy attachment requires the current account to have the Tag Policy feature enabled.
+This example creates tag policies, meta tags, and associated rules, which are free services. However, ensure your account has the Tag Policy feature enabled before running this example.

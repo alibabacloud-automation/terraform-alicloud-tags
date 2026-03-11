@@ -2,62 +2,66 @@
 
 [English](https://github.com/alibabacloud-automation/terraform-alicloud-tags/blob/main/README.md) | 简体中文
 
-用于在阿里云资源上生成标准化标签并管理标签治理的 Terraform 模块。该模块基于项目元数据（如环境、预算、GDPR 分类和灾备状态）计算一组一致的标签键值对，并可选创建标签治理资源，包括标签策略、预置标签和资源自动关联标签规则。
+用于管理阿里云标签治理的 Terraform 模块。该模块帮助您创建和管理标签策略、预置标签和资源自动关联标签规则，以建立企业级标签治理标准。
 
 ## 使用方法
 
-### 基础用法：生成标准化标签
+### 基础用法：注册预置标签和配置标签传播规则
 
 ```terraform
-module "tags" {
-  source  = "alibabacloud-automation/tags/alicloud"
+module "tag_management" {
+  source = "alibabacloud-automation/tags/alicloud"
 
-  geozone           = "cn-hangzhou"
-  budget            = "PRODUIT_A"
-  project           = "PRJ"
-  rgpd_personal     = true
-  rgpd_confidential = false
-  environment       = "DEV"
-  repository        = "my-infra-repo"
+  # 注册预置标签
+  # 注意：alicloud_tag_meta_tag 仅支持 cn-hangzhou 地域
+  tag_meta_tags = {
+    "A_PROJECT"      = ["PRJ", "PRO"]
+    "A_ENVIRONMENT"  = ["DEV", "TST"]
+    Owner            = ["team-dev", "team-ops"]
+  }
+
+  # 配置资源自动关联标签规则
+  tag_associated_rules = {
+    "ecs_eni_rule" = {
+      setting_name = "rule:AttachEni-DetachEni-TagInstance:Ecs-Instance:Ecs-Eni"
+      status       = "Enable"
+      tag_keys     = ["Owner", "A_PROJECT"]
+    }
+  }
 }
 ```
 
-### 高级用法：使用标签策略和预置标签进行标签治理
+### 高级用法：创建标签策略并绑定到账号
 
 ```terraform
-module "tags" {
-  source  = "alibabacloud-automation/tags/alicloud"
+data "alicloud_account" "current" {}
 
-  geozone           = "cn-hangzhou"
-  budget            = "CORP_BUDGET"
-  project           = "PRJ"
-  rgpd_personal     = true
-  rgpd_confidential = false
-  environment       = "PRD"
+module "tag_policies" {
+  source = "alibabacloud-automation/tags/alicloud"
 
-  # 创建标签策略并绑定到当前账号
-  tag_policy = {
-    enabled     = true
-    policy_name = "standard-tag-policy"
-    user_type   = "USER"
-    policy_content = jsonencode({
-      tags = {
-        CostCenter = {
-          tag_key   = { "@@assign" = "CostCenter" }
-          tag_value = { "@@assign" = ["cost-center-123", "cost-center-456"] }
+  tag_policies = {
+    "cost_center_policy" = {
+      policy_name = "CostCenterPolicy"
+      policy_desc = "Enforce CostCenter tag with allowed values"
+      policy_content = jsonencode({
+        tags = {
+          CostCenter = {
+            tag_key   = { "@@assign" = "CostCenter" }
+            tag_value = { "@@assign" = ["cost-center-123", "cost-center-456"] }
+          }
         }
-      }
-    })
-    targets = [
-      {
-        target_id   = "your-account-id"
-        target_type = "USER"
-      }
-    ]
+      })
+      user_type = "USER"
+    }
   }
 
-  # 将标准标签注册为预置标签（仅支持 cn-hangzhou 地域）
-  create_meta_tags = true
+  tag_policy_attachments = {
+    "attach_to_account" = {
+      policy_key  = "cost_center_policy"
+      target_id   = data.alicloud_account.current.id
+      target_type = "USER"
+    }
+  }
 }
 ```
 

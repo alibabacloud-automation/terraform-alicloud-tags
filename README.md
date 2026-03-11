@@ -2,62 +2,66 @@
 
 English | [简体中文](https://github.com/alibabacloud-automation/terraform-alicloud-tags/blob/main/README-CN.md)
 
-Terraform module for generating standardized tags and managing tag governance on Alibaba Cloud. This module computes a consistent set of tag key-value pairs based on project metadata such as environment, budget, GDPR classification, and disaster recovery status, and optionally creates tag governance resources including tag policies, meta tags (predefined tags), and associated resource tag rules.
+Terraform module for managing tag governance on Alibaba Cloud. This module helps you create and manage tag policies, meta tags (predefined tags), and associated resource tag rules to establish enterprise-wide tag governance standards.
 
 ## Usage
 
-### Basic: Generate standardized tags
+### Basic: Register meta tags and configure tag propagation rules
 
 ```terraform
-module "tags" {
-  source  = "alibabacloud-automation/tags/alicloud"
+module "tag_management" {
+  source = "alibabacloud-automation/tags/alicloud"
 
-  geozone           = "cn-hangzhou"
-  budget            = "PRODUIT_A"
-  project           = "PRJ"
-  rgpd_personal     = true
-  rgpd_confidential = false
-  environment       = "DEV"
-  repository        = "my-infra-repo"
+  # Register meta tags (predefined tags)
+  # Note: alicloud_tag_meta_tag only supports cn-hangzhou region
+  tag_meta_tags = {
+    "A_PROJECT"      = ["PRJ", "PRO"]
+    "A_ENVIRONMENT"  = ["DEV", "TST"]
+    Owner            = ["team-dev", "team-ops"]
+  }
+
+  # Configure associated rules for automatic tag propagation
+  tag_associated_rules = {
+    "ecs_eni_rule" = {
+      setting_name = "rule:AttachEni-DetachEni-TagInstance:Ecs-Instance:Ecs-Eni"
+      status       = "Enable"
+      tag_keys     = ["Owner", "A_PROJECT"]
+    }
+  }
 }
 ```
 
-### Advanced: Tag governance with policies and meta tags
+### Advanced: Create tag policies and attach to account
 
 ```terraform
-module "tags" {
-  source  = "alibabacloud-automation/tags/alicloud"
+data "alicloud_account" "current" {}
 
-  geozone           = "cn-hangzhou"
-  budget            = "CORP_BUDGET"
-  project           = "PRJ"
-  rgpd_personal     = true
-  rgpd_confidential = false
-  environment       = "PRD"
+module "tag_policies" {
+  source = "alibabacloud-automation/tags/alicloud"
 
-  # Create a tag policy and attach it to the current account
-  tag_policy = {
-    enabled     = true
-    policy_name = "standard-tag-policy"
-    user_type   = "USER"
-    policy_content = jsonencode({
-      tags = {
-        CostCenter = {
-          tag_key   = { "@@assign" = "CostCenter" }
-          tag_value = { "@@assign" = ["cost-center-123", "cost-center-456"] }
+  tag_policies = {
+    "cost_center_policy" = {
+      policy_name = "CostCenterPolicy"
+      policy_desc = "Enforce CostCenter tag with allowed values"
+      policy_content = jsonencode({
+        tags = {
+          CostCenter = {
+            tag_key   = { "@@assign" = "CostCenter" }
+            tag_value = { "@@assign" = ["cost-center-123", "cost-center-456"] }
+          }
         }
-      }
-    })
-    targets = [
-      {
-        target_id   = "your-account-id"
-        target_type = "USER"
-      }
-    ]
+      })
+      user_type = "USER"
+    }
   }
 
-  # Register standard tags as predefined meta tags (cn-hangzhou only)
-  create_meta_tags = true
+  tag_policy_attachments = {
+    "attach_to_account" = {
+      policy_key  = "cost_center_policy"
+      target_id   = data.alicloud_account.current.id
+      target_type = "USER"
+    }
+  }
 }
 ```
 

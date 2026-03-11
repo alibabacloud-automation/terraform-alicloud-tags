@@ -15,3 +15,7 @@ To clean up:
 ```bash
 terraform destroy
 ```
+
+## Cost
+
+This example creates tag meta tags and associated rules, which are free services. 
